@@ -656,6 +656,5 @@ exports.take = take;
 exports.toLowerCase = toLowerCase;
 exports.toString = toString;
 exports.toUpperCase = toUpperCase;
-exports.trace = trace;
 exports.traverse = traverse;
 exports.unsafePerformIO = unsafePerformIO;
