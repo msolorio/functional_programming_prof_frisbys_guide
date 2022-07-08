@@ -508,6 +508,8 @@ const eq = curry((a, b) => a === b);
 // filter :: (a -> Boolean) -> [a] -> [a]
 const filter = curry((fn, xs) => xs.filter(fn));
 
+// find :: (a -> Boolean) -> [a] -> a | undefined
+const find = curry((f, xs) => xs.find(f));
 
 // forEach :: (a -> ()) -> [a] -> ()
 const forEach = curry((fn, xs) => xs.forEach(fn));
@@ -598,6 +600,8 @@ const toString = String;
 // toUpperCase :: String -> String
 const toUpperCase = s => s.toUpperCase();
 
+const trace = curry((tag, x) => { console.log(tag, x); return x; });
+
 
 // traverse :: (Applicative f, Traversable t) => (a -> f a) -> (a -> f b) -> t a -> f (t b)
 const traverse = curry((of, fn, f) => f.traverse(of, fn));
@@ -634,6 +638,7 @@ exports.chain = chain;
 exports.concat = concat;
 exports.eq = eq;
 exports.filter = filter;
+exports.find = find;
 exports.flip = flip;
 exports.forEach = forEach;
 exports.head = head;
@@ -656,5 +661,6 @@ exports.take = take;
 exports.toLowerCase = toLowerCase;
 exports.toString = toString;
 exports.toUpperCase = toUpperCase;
+exports.trace = trace;
 exports.traverse = traverse;
 exports.unsafePerformIO = unsafePerformIO;
