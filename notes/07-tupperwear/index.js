@@ -14,8 +14,33 @@ const {
   last,
   eq,
   head,
-  find
+  find,
+  Task,
+  append,
+  toUpperCase,
+  safeProp
 } = require('../../mostly-adequate-guide/support');
+
+const axios = require('axios').default;
+
+////////////////////////////////////////////////////////////////////////
+class Container {
+  constructor(x) {
+    this.$value = x;
+  }
+
+  static of(x) {
+    return new Container(x);
+  }
+
+  map(fn) {
+    return Container.of(fn(this.$value))
+  }
+
+  inspect() {
+    return `Just(${this.$value})`;
+  }
+}
 
 
 // Lesson code /////////////////////////////////////////////////////////
@@ -219,23 +244,23 @@ const either = curry((f, g, e) => {
 // zoltar2({ birthDate: '2000-12-12' });
 
 ///////////////////////////////////////////////////////////////////////////
-// class IO {
-//   static of(x) {
-//     return new IO(() => x);
-//   }
+class IO {
+  static of(x) {
+    return new IO(() => x);
+  }
 
-//   constructor(fn) {
-//     this.$value = fn; // this.$value is a function that returns x
-//   }
+  constructor(fn) {
+    this.$value = fn; // this.$value is a function that returns x
+  }
 
-//   map(fn) {
-//     return new IO(compose(fn, this.$value))
-//   }
+  map(fn) {
+    return new IO(compose(fn, this.$value))
+  }
 
-//   inspect() {
-//     return `IO(${inspect(this.$value())})`;
-//   }
-// }
+  inspect() {
+    return `IO(${inspect(this.$value())})`;
+  }
+}
 
 // const ioProcess = new IO(() => process);
 
@@ -267,15 +292,15 @@ const either = curry((f, g, e) => {
 // Using the IO Functor to wrap I/O side effects and trigger them when needed in
 // an obvious way with .unsafePerformIO()
 
-class IO {
-  constructor(io) {
-    this.unsafePerformIO = io;
-  }
+// class IO {
+//   constructor(io) {
+//     this.unsafePerformIO = io;
+//   }
 
-  map(fn) {
-    return new IO(compose(fn, this.unsafePerformIO));
-  }
-}
+//   map(fn) {
+//     return new IO(compose(fn, this.unsafePerformIO));
+//   }
+// }
 
 // simulates pulling the URL from the browser window
 const url = new IO(() => 'https://mywebsite.com?param1=val1&param2=val2');
@@ -293,4 +318,163 @@ const params = compose(toPairs, last, split('?'));
 const findParam = key => map(compose(Maybe.of, find(compose(eq(key), head)), params), url);
 
 
-console.log(findParam('param3').unsafePerformIO());
+// console.log(findParam('param2').unsafePerformIO());
+
+/////////////////////////////////////////////////////////////////////////////////
+// Async code
+const fs = require('fs');
+
+const getJSON = curry((url, params) => new Task((reject, resolve) => {
+  axios.get(url, params)
+    .then(resolve)
+    .catch(reject)
+}))
+
+const getJSONTask = getJSON('https://api.kanye.rest/', null)
+  .map(compose(prop('quote'), prop('data')));
+
+// getJSONTask.fork(
+//   error => console.log('error:', error),
+//   result => console.log('data:', result)
+// );
+
+const readFile = filename => new Task((reject, resolve) => {
+  fs.readFile(filename, 'utf-8', (err, data) => err ? reject(err) : resolve(data));
+});
+
+// const readTask = readFile('test.txt').map(split('\n')).map(head);
+const readTask = readFile('test.txt').map(split('\n')).map(head);
+
+// readTask.fork(
+//   error => console.log('error:', error),
+//   line => console.log('line:', line)
+// )
+
+// const result = Task.of(3).map(num => num + 1);
+const numTask = Task.of(3);
+// numTask.fork(
+//   error => console.log('error:', error),
+//   num => console.log('num:', num)
+// );
+
+////////////////////////////////////////////////////////////
+const idLaw1 = map(identity);
+const idLaw2 = identity;
+
+// console.log(idLaw1(Container.of(2)).inspect()); // Just(2)
+// console.log(idLaw2(Container.of(2)).inspect()); // Just(2)
+
+// const compLaw1 = compose(map(append(' run')), map(append(' spot')));
+// const compLaw2 = map(compose(append(' run'), append(' spot')));
+
+// console.log(compLaw1(Container.of('See')).inspect());
+// console.log(compLaw2(Container.of('See')).inspect());
+
+////////////////////////////////////////////////////////////
+const nested = Task.of([Either.of('pillows'), left('no sleep for you')]);
+
+// map(map(map(toUpperCase)), nested).fork(
+//   (err) => console.log(err),
+//   (data) => console.log('data:', data)
+// );
+// Task([Right('PILLOWS'), Left('no sleep for you')])
+
+///////////////////////////////////////////////////////////
+// incrF :: Functor f => f Int -> f Int
+const incrF = map(add(1));
+const myVal = incrF(Container.of(2)).inspect();
+
+// console.log('myVal ==>', myVal);
+
+////////////////////////////////////////
+// initial :: User -> Maybe String
+const initial = compose(
+  map(head),
+  safeProp('name')
+);
+
+const maybeStr = initial({
+  id: 2,
+  name: 'Albert',
+  active: true,
+});
+
+// console.log('maybeStr ==>', maybeStr)
+
+//////////////////////////////////////////////////////////
+// Given the following helper functions:
+//
+  // showWelcome :: User -> String
+  const showWelcome = compose(concat('Welcome '), prop('name'));
+
+  // checkActive :: User -> Either String User
+  const checkActive = function checkActive(user) {
+    return user.active
+      ? Either.of(user)
+      : left('Your account is not active');
+  };
+
+// Write a function that uses `checkActive` and `showWelcome` to grant access or return the error.
+
+// eitherWelcome :: User -> Either String String
+const eitherWelcome = compose(
+  map(showWelcome),
+  checkActive,
+);
+
+const result = eitherWelcome({
+  active: true,
+  name: 'Victor'
+});
+
+// console.log('result.inspect() ==>', result.inspect())
+
+///////////////////////////////////////////////////////////
+// We now consider the following functions:
+//
+//   // validateUser :: (User -> Either String ()) -> User -> Either String User
+const validateUser = curry((validate, user) => validate(user).map(_ => user));
+//
+//   // save :: User -> IO User
+const save = user => new IO(() => ({ ...user, saved: true }));
+//
+// Write a function `validateName` which checks whether a user has a name longer than 3 characters
+// or return an error message. Then use `either`, `showWelcome` and `save` to write a `register`
+// function to signup and welcome a user when the validation is ok.
+//
+// Remember either's two arguments must return the same type.
+
+// validateName :: User -> Either String ()
+const validateName = user => {
+  return user.name.length > 3
+    ? Either.of(user.name)
+    : left('Name should be longer than 3 characters.');
+};
+
+const saveAndWelcome = compose(map(showWelcome), save);
+
+// register :: User -> IO String
+const register = compose(
+  either(IO.of, saveAndWelcome),
+  validateUser(validateName),
+);
+
+const result2 = register({
+  name: 'Lut'
+});
+
+console.log('result2 ==>', result2.$value());
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -13,4 +13,7 @@
 // Write a function that uses `checkActive` and `showWelcome` to grant access or return the error.
 
 // eitherWelcome :: User -> Either String String
-const eitherWelcome = undefined;
+const eitherWelcome = compose(
+  map(showWelcome),
+  checkActive,
+);

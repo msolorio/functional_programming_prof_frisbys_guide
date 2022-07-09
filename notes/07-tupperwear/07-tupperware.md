@@ -205,3 +205,88 @@ const left = x => new Left(x);
 ```
 
 [See playground code for further implementation]
+
+
+---
+
+Using Task and Either to separate async tasks from pure code.
+```js
+// Postgres.connect :: Url -> IO DbConnection
+// runQuery :: DbConnection -> ResultSet
+// readFile :: String -> Task Error String
+
+// -- Pure application -------------------------------------------------
+
+// dbUrl :: Config -> Either Error Url
+const dbUrl = ({ uname, pass, host, db }) => {
+  if (uname && pass && host && db) {
+    return Either.of(`db:pg://${uname}:${pass}@${host}5432/${db}`);
+  }
+
+  return left(Error('Invalid config!'));
+};
+
+// connectDb :: Config -> Either Error (IO DbConnection)
+const connectDb = compose(map(Postgres.connect), dbUrl);
+
+// getConfig :: Filename -> Task Error (Either Error (IO DbConnection))
+const getConfig = compose(map(compose(connectDb, JSON.parse)), readFile);
+
+
+// -- Impure calling code ----------------------------------------------
+
+getConfig('db.json').fork(
+  logErr('couldn\'t read file'),
+  either(console.log, map(runQuery)),
+);
+```
+
+---
+
+### A Spot of Theory
+
+```js
+// topRoute :: String -> Maybe String
+const topRoute = compose(Maybe.of, reverse);
+
+// bottomRoute :: String -> Maybe String
+const bottomRoute = compose(map(reverse), Maybe.of);
+
+topRoute('hi'); // Just('ih')
+bottomRoute('hi'); // Just('ih')
+```
+
+We can convert to maybe first and then apply translation or the other way around.
+
+---
+
+## A Spot of Theory
+
+Composing Functors
+- Come back to this.
+
+```js
+class Compose {
+  constructor(fgx) {
+    this.getCompose = fgx;
+  }
+
+  static of(fgx) {
+    return new Compose(fgx);
+  }
+
+  map(fn) {
+    return new Compose(map(map(fn), this.getCompose));
+  }
+}
+
+const tmd = Task.of(Maybe.of('Rock over London'));
+
+const ctmd = Compose.of(tmd);
+
+const ctmd2 = map(append(', rock on, Chicago'), ctmd);
+// Compose(Task(Just('Rock over London, rock on, Chicago')))
+
+ctmd2.getCompose;
+// Task(Just('Rock over London, rock on, Chicago'))
+```
